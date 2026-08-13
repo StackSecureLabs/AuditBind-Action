@@ -13,7 +13,7 @@ In the repository you want to monitor:
 1. Open **Settings → Secrets and variables → Actions**.
 2. Select **New repository secret**.
 3. Name the secret `AUDITBIND_API_KEY`.
-4. Paste the API key issued by your AuditBind dashboard.
+4. Paste the repository-scoped API key issued by the repository's setup page in AuditBind.
 
 Never place the API key directly in a workflow file.
 
@@ -44,9 +44,9 @@ jobs:
         uses: StackSecureLabs/AuditBind-Action@v1
         with:
           auditbind_api_key: ${{ secrets.AUDITBIND_API_KEY }}
-          required_approvals: '1'
-          fail_on_critical: 'true'
-          comment_on_pr: 'true'
+          required_approvals: "1"
+          fail_on_critical: "true"
+          comment_on_pr: "true"
 
       - name: Preserve local evidence
         if: always()
@@ -60,22 +60,13 @@ jobs:
 
 AuditBind evaluates the pull request, posts or updates a summary comment, writes an evidence artifact under `evidence/`, and uploads the result when an AuditBind API key is supplied.
 
-## Use one key across multiple repositories
+## Keys are scoped to one repository
 
-You can store one AuditBind API key as an organization-level GitHub Actions secret:
+Issue a separate key for each connected repository. The key is bound to GitHub's stable numeric repository ID, so a key copied to another repository is rejected and cannot write evidence into the wrong project.
 
-1. Open the GitHub organization **Settings**.
-2. Select **Secrets and variables → Actions**.
-3. Create an organization secret named `AUDITBIND_API_KEY`.
-4. Grant access to all repositories or only the repositories that should report to AuditBind.
+You can still manage deployment centrally with reusable workflows or organization automation. Store each issued value only in the matching repository's `AUDITBIND_API_KEY` secret. Organization-wide upload credentials are not part of v1.
 
-Use the same input in each repository:
-
-```yaml
-auditbind_api_key: ${{ secrets.AUDITBIND_API_KEY }}
-```
-
-Every run includes the repository owner and name, commit SHA, branch, and pull-request number so the dashboard can separate results by repository.
+Use the regional base URL shown on the repository setup page. US workspaces use `https://ingest.auditbind.com`; EU workspaces use `https://eu.ingest.auditbind.com`. A request sent to the wrong region follows one safe HTTPS redirect.
 
 ## What AuditBind evaluates
 
@@ -107,30 +98,33 @@ Set `comment_on_pr: 'false'` if you do not want pull-request comments.
 
 ## Inputs
 
-| Input | Default | Description |
-| --- | --- | --- |
-| `github_token` | GitHub workflow token | Reads pull-request metadata and optionally posts comments. |
-| `required_approvals` | `1` | Minimum approving reviews required by CC8.1. |
-| `stale_approval_days` | `30` | Approvals older than this are treated as stale. |
-| `fail_on_critical` | `true` | Fail the job when a critical finding is detected. |
-| `comment_on_pr` | `true` | Create or update an AuditBind pull-request comment. |
-| `auditbind_api_key` | Empty | AuditBind dashboard API key. Upload is skipped when omitted. |
-| `auditbind_api_url` | `https://api.auditbind.io` | AuditBind API base URL. Usually unchanged. |
-| `output_dir` | `./evidence` | Directory for the JSON evidence artifact. |
-| `llm_api_key` | Empty | Optional customer-provided LLM key for CC7.1 and CC7.2. |
-| `llm_provider` | `auto` | Provider name or automatic detection from the model. |
-| `llm_model` | `gpt-4o-mini` | Model used for optional LLM analysis. |
-| `llm_base_url` | Empty | Optional custom OpenAI-compatible endpoint. |
+| Input                 | Default                        | Description                                                  |
+| --------------------- | ------------------------------ | ------------------------------------------------------------ |
+| `github_token`        | GitHub workflow token          | Reads pull-request metadata and optionally posts comments.   |
+| `required_approvals`  | `1`                            | Minimum approving reviews required by CC8.1.                 |
+| `stale_approval_days` | `30`                           | Approvals older than this are treated as stale.              |
+| `fail_on_critical`    | `true`                         | Fail the job when a critical finding is detected.            |
+| `comment_on_pr`       | `true`                         | Create or update an AuditBind pull-request comment.          |
+| `auditbind_api_key`   | Empty                          | AuditBind dashboard API key. Upload is skipped when omitted. |
+| `auditbind_api_url`   | `https://ingest.auditbind.com` | AuditBind ingest origin or full `/api/v1/evidence` URL.      |
+| `output_dir`          | `./evidence`                   | Directory for the JSON evidence artifact.                    |
+| `llm_api_key`         | Empty                          | Optional customer-provided LLM key for CC7.1 and CC7.2.      |
+| `llm_provider`        | `auto`                         | Provider name or automatic detection from the model.         |
+| `llm_model`           | `gpt-4o-mini`                  | Model used for optional LLM analysis.                        |
+| `llm_base_url`        | Empty                          | Optional custom OpenAI-compatible endpoint.                  |
 
 ## Outputs
 
-| Output | Description |
-| --- | --- |
-| `verdict` | `PASS`, `FAIL`, `NOT_APPLICABLE`, or `ERROR`. |
-| `artifact_path` | Path to the generated evidence JSON file. |
-| `artifact_hash` | SHA-256 hash of the evidence artifact. |
-| `findings_count` | Findings reported by the primary change-management evaluation. |
-| `dashboard_url` | Dashboard URL returned after a successful upload. |
+| Output           | Description                                                   |
+| ---------------- | ------------------------------------------------------------- |
+| `verdict`        | `PASS`, `FAIL`, `NOT_APPLICABLE`, or `ERROR`.                 |
+| `artifact_path`  | Path to the generated evidence JSON file.                     |
+| `artifact_hash`  | SHA-256 hash of the evidence artifact.                        |
+| `findings_count` | Total findings reported across every evaluated control.       |
+| `dashboard_url`  | Dashboard URL returned after a successful upload.             |
+| `upload_status`  | `uploaded`, `duplicate`, `skipped`, or `error`.               |
+| `evidence_id`    | Stable cloud evidence record ID.                              |
+| `reason`         | Machine-readable reason when no pull-request evaluation runs. |
 
 Example:
 
@@ -163,6 +157,22 @@ GitHub does not provide repository secrets to workflows triggered by pull reques
 
 Do not switch to `pull_request_target` solely to expose secrets to untrusted fork code.
 
+## Testing against a development environment
+
+Keep a changing tunnel or staging origin in a GitHub Actions repository variable instead of
+hardcoding it in the workflow. Create `AUDITBIND_API_URL` under **Settings → Secrets and
+variables → Actions → Variables**, then pass it to the Action:
+
+```yaml
+with:
+  auditbind_api_key: ${{ secrets.AUDITBIND_API_KEY }}
+  auditbind_api_url: ${{ vars.AUDITBIND_API_URL }}
+```
+
+For a Cloudflare Quick Tunnel, the value is the HTTPS origin only, such as
+`https://example.trycloudflare.com`. AuditBind appends `/api/v1/evidence`. The API key remains
+a secret and must never be stored as a variable.
+
 ## Version pinning
 
 For normal use, pin to the latest compatible major:
@@ -177,7 +187,9 @@ Security-sensitive organizations can pin the action to a full commit SHA.
 
 ### No dashboard results
 
-Confirm that the secret is named `AUDITBIND_API_KEY`, the workflow passes it as `auditbind_api_key`, the organization secret can access the repository, and the pull request was not opened from a fork. Local evidence is still generated when dashboard upload is unavailable.
+Confirm that the secret is named `AUDITBIND_API_KEY`, the workflow passes it as
+`auditbind_api_key`, the key was issued for this exact repository, and the pull request was not
+opened from a fork. Local evidence is still generated when dashboard upload is unavailable.
 
 ### Pull-request comment is missing
 

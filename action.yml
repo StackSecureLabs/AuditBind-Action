@@ -1,73 +1,79 @@
-name: 'AuditBind SOC 2 Evidence'
-description: 'Evaluate pull requests for SOC 2 controls, generate tamper-evident evidence, and report results to AuditBind.'
-author: 'StackSecure Labs'
+name: "AuditBind SOC 2 Evidence"
+description: "Evaluate pull requests for SOC 2 controls, generate tamper-evident evidence, and report results to AuditBind."
+author: "StackSecure Labs"
 
 branding:
-  icon: 'shield'
-  color: 'blue'
+  icon: "shield"
+  color: "blue"
 
 inputs:
   github_token:
-    description: 'GitHub token used to read pull-request metadata and optionally post comments.'
+    description: "GitHub token used to read pull-request metadata and optionally post comments."
     required: false
     default: ${{ github.token }}
   required_approvals:
-    description: 'Minimum number of approving reviews required for CC8.1.'
+    description: "Minimum number of approving reviews required for CC8.1."
     required: false
-    default: '1'
+    default: "1"
   stale_approval_days:
-    description: 'Approvals older than this number of days are considered stale.'
+    description: "Approvals older than this number of days are considered stale."
     required: false
-    default: '30'
+    default: "30"
   fail_on_critical:
-    description: 'Fail the workflow when a critical control finding is detected.'
+    description: "Fail the workflow when a critical control finding is detected."
     required: false
-    default: 'true'
+    default: "true"
   comment_on_pr:
-    description: 'Create or update an AuditBind summary comment on the pull request.'
+    description: "Create or update an AuditBind summary comment on the pull request."
     required: false
-    default: 'true'
+    default: "true"
   llm_api_key:
-    description: 'Optional customer-provided LLM API key for enhanced CC7.1 and CC7.2 analysis.'
+    description: "Optional customer-provided LLM API key for enhanced CC7.1 and CC7.2 analysis."
     required: false
-    default: ''
+    default: ""
   llm_provider:
-    description: 'LLM provider: auto, openai, anthropic, google, xai, deepseek, moonshot, zhipu, or groq.'
+    description: "LLM provider: auto, openai, anthropic, google, xai, deepseek, moonshot, zhipu, or groq."
     required: false
-    default: 'auto'
+    default: "auto"
   llm_model:
-    description: 'Model used for optional LLM analysis.'
+    description: "Model used for optional LLM analysis."
     required: false
-    default: 'gpt-4o-mini'
+    default: "gpt-4o-mini"
   llm_base_url:
-    description: 'Optional custom OpenAI-compatible API endpoint.'
+    description: "Optional custom OpenAI-compatible API endpoint."
     required: false
-    default: ''
+    default: ""
   auditbind_api_key:
-    description: 'AuditBind dashboard API key. When omitted, upload is skipped and evidence remains local.'
+    description: "AuditBind dashboard API key. When omitted, upload is skipped and evidence remains local."
     required: false
-    default: ''
+    default: ""
   auditbind_api_url:
-    description: 'AuditBind API base URL.'
+    description: "AuditBind ingest origin or full /api/v1/evidence endpoint."
     required: false
-    default: 'https://api.auditbind.io'
+    default: "https://ingest.auditbind.com"
   output_dir:
-    description: 'Directory where AuditBind writes the JSON evidence artifact.'
+    description: "Directory where AuditBind writes the JSON evidence artifact."
     required: false
-    default: './evidence'
+    default: "./evidence"
 
 outputs:
   verdict:
-    description: 'Overall verdict: PASS, FAIL, NOT_APPLICABLE, or ERROR.'
+    description: "Overall verdict: PASS, FAIL, NOT_APPLICABLE, or ERROR."
   artifact_path:
-    description: 'Path to the generated evidence JSON file.'
+    description: "Path to the generated evidence JSON file."
   artifact_hash:
-    description: 'SHA-256 hash of the generated evidence artifact.'
+    description: "SHA-256 hash of the generated evidence artifact."
   findings_count:
-    description: 'Findings reported by the primary change-management evaluation.'
+    description: "Total findings reported across every evaluated control."
   dashboard_url:
-    description: 'Dashboard URL returned after a successful evidence upload.'
+    description: "Dashboard URL returned after a successful evidence upload."
+  upload_status:
+    description: "Cloud upload result: uploaded, duplicate, skipped, or error."
+  evidence_id:
+    description: "Stable AuditBind evidence record ID returned by the cloud API."
+  reason:
+    description: "Machine-readable reason when the Action does not evaluate a pull request."
 
 runs:
-  using: 'node24'
-  main: 'dist/index.js'
+  using: "node24"
+  main: "dist/index.js"
